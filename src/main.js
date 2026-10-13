@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-import { VIEWS, TIMES, BOARD_MODES, ROOM, DESK } from './spec.js';
+import { VIEWS, TIMES, BOARD_MODES, ROOM, WALL, DESK } from './spec.js';
 import * as TX from './textures.js';
 import * as B from './boards.js';
 import {
@@ -19,6 +19,7 @@ import { buildWorld } from './world.js';
 import { buildFurniture } from './furniture.js';
 import { buildProps } from './props.js';
 import { createLighting } from './lighting.js';
+import { createNav, buildColliders, EYE_STAND } from './nav.js';
 import {
   initLoading, initPanels, initHotspotCard, initHoverLabel, initModal,
   buildHelpHTML, buildAssetReportHTML, wireReportCopy,
@@ -29,6 +30,10 @@ import { sunDirection, clamp, smoothstep, deg } from './util.js';
 /* 0) 起動                                                             */
 /* ------------------------------------------------------------------ */
 const canvas = document.getElementById('scene');
+
+/** タッチ端末では Pointer Lock が使えないので、ドラッグ＋タップ操作にする */
+const isTouch = (window.matchMedia && window.matchMedia('(hover: none)').matches)
+  || (navigator.maxTouchPoints || 0) > 0;
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({
@@ -51,8 +56,9 @@ renderer.shadowMap.autoUpdate = false;
 renderer.shadowMap.needsUpdate = true;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 400);
-camera.position.set(-2.95, 1.28, -3.45);
+// 一人称（歩く）モードが既定。near は机に顔を近づけても破綻しないよう小さく
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.04, 400);
+camera.position.set(-2.95, EYE_STAND, -3.45);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -64,6 +70,7 @@ controls.maxPolarAngle = Math.PI * 0.495;
 controls.autoRotateSpeed = 0.32;
 controls.zoomSpeed = 0.7;
 controls.panSpeed = 0.6;
+controls.enabled = false;   // 起動時は一人称モード
 controls.update();
 
 /* ------------------------------------------------------------------ */
@@ -159,9 +166,10 @@ const state = {
   screenMats: [],
   nightLights: [],
   hotspots: [],
+  mode: 'walk',          // 'walk' = 一人称（歩く） / 'orbit' = 俯瞰（見渡す）
 };
 
-let world, furniture, props, lighting, invWall;
+let world, furniture, props, lighting, invWall, nav;
 
 async function boot() {
   /* --- アセット --- */
@@ -206,6 +214,26 @@ async function boot() {
   scene.traverse((o) => {
     if (o.userData && o.userData.hotspot) state.hotspots.push(o);
   });
+
+  /* --- 一人称ナビゲーション（当たり判定つき）--- */
+  let colliders = [];
+  try {
+    colliders = buildColliders({ furniture, world });
+  } catch (e) {
+    console.warn('[main] 当たり判定を生成できませんでした（すり抜け可のまま続行）:', e);
+  }
+  nav = createNav({
+    camera, dom: canvas, colliders, controls,
+    onLockChange: (locked) => setLockUI(locked),
+    onInteract: () => { interact(); },
+    onModeChange: (m) => {
+      state.mode = m;
+      if (ui) ui.setMode(m);
+      setLockUI(m === 'walk' && nav ? nav.locked : false);
+      if (m !== 'walk') hideGaze();
+    },
+  });
+  console.info(`[nav] 当たり判定 ${colliders.length} 件（机・教卓・棚・自販機・壁）`);
 
   /* --- UI --- */
   loading.setProgress(0.99, '入室しています…');
@@ -305,18 +333,22 @@ function applyView(v, instant) {
     const T = TIMES.find((t) => t.id === v.time) || state.time;
     applyTime(T, true);
   }
-  if (instant) {
+  if (nav && nav.mode === 'walk') {
+    // 一人称：その場面の「立ち位置」と「向き」へ移る（fp が無い preset は俯瞰用から推定）
+    const fp = v.fp || { pos: [v.pos[0], EYE_STAND, v.pos[2]], look: v.target };
+    nav.teleport(fp.pos, fp.look);
+    tween.active = false;
+    lastWallSide = wallSideOf(nav.position.x);
+  } else if (instant) {
     camera.position.set(v.pos[0], v.pos[1], v.pos[2]);
     controls.target.set(v.target[0], v.target[1], v.target[2]);
     controls.update();
 
-  // 注視点が教室の外へ飛ばないように（「やや狭い」教室の外側へは行かせない）
-  {
+    // 注視点が教室の外へ飛ばないように（「やや狭い」教室の外側へは行かせない）
     const t2 = controls.target;
     t2.x = clamp(t2.x, -ROOM.w / 2 + 0.3, ROOM.w / 2 + 1.2);
     t2.y = clamp(t2.y, 0.15, ROOM.h - 0.15);
     t2.z = clamp(t2.z, -ROOM.d / 2 - 0.2, ROOM.d / 2 + 0.2);
-  }
     tween.active = false;
   } else {
     flyTo(v.pos, v.target, 1.6);
@@ -338,20 +370,43 @@ function wireUI() {
     onTime: (t) => applyTime(t),
     onBoard: (m) => setBoard(m.id),
     onToggle: (id, on) => setToggle(id, on),
+    onMode: (m) => setMode(m),
   });
   hotspotCard = initHotspotCard();
   hoverLabel = initHoverLabel();
-  modal = initModal();
+  modal = initModal(() => {
+    // モーダルを閉じたら歩行操作を戻す
+    if (nav) nav.setEnabled(true);
+    setLockUI(nav ? nav.locked : false);
+  });
 
   ui.setTime(state.time.id);
   ui.setBoard(state.board);
   ui.setView('dead');
+  ui.setMode(state.mode);
 
+  /* --- 一人称用の UI 結線 --- */
+  const lp = document.getElementById('lock-prompt');
+  lp.addEventListener('click', () => { if (nav) nav.requestLock(); });
+  setLockUI(false);
+
+  // タッチ端末では移動スティックを出す
+  if (isTouch && nav) {
+    const ts = document.getElementById('touch-stick');
+    if (ts) { ts.hidden = false; nav.wireStick(ts); }
+  }
+
+  const openModal = (html) => {
+    if (nav) { nav.releaseLock(); nav.setEnabled(false); }
+    hideGaze();
+    modal.open(html);
+    setLockUI(false);
+  };
   document.getElementById('btn-help').addEventListener('click', () => {
-    modal.open(buildHelpHTML());
+    openModal(buildHelpHTML());
   });
   document.getElementById('btn-report').addEventListener('click', () => {
-    modal.open(buildAssetReportHTML());
+    openModal(buildAssetReportHTML());
     wireReportCopy();
   });
 
@@ -362,9 +417,116 @@ function wireUI() {
   window.addEventListener('pointerdown', killHint);
 }
 
+/* ------------------------------------------------------------------ */
+/* 8-b) 一人称モードの UI・視線・ギミック                                */
+/* ------------------------------------------------------------------ */
+
+/** 移動モードを切り替える（UI ボタンから） */
+function setMode(m) {
+  if (!nav) return;
+  nav.setMode(m);
+}
+
+/** 照準・ロック案内・カーソルの表示をまとめて更新 */
+function setLockUI(locked) {
+  const ch = document.getElementById('crosshair');
+  const lp = document.getElementById('lock-prompt');
+  const walk = !!nav && nav.mode === 'walk';
+  const modalOpen = modal && !document.getElementById('modal').hidden;
+  const cardOpen = !!hotspotCard && hotspotCard.isVisible();
+  // タッチ端末では Pointer Lock が使えないので、照準を常に出してタップで調べる
+  if (ch) ch.hidden = !(walk && (locked || isTouch));
+  // 引用カードが出ている間はロック案内を隠す（場所が重なるため）
+  if (lp) lp.hidden = !(walk && !locked) || !!modalOpen || cardOpen || isTouch;
+  canvas.style.cursor = walk && locked ? 'none' : '';
+  if (!walk || !locked) hideGaze();
+}
+
+/* --- 視線（画面中央）でホットスポットを拾う --- */
+const gazeRay = new THREE.Raycaster();
+const gazeDir = new THREE.Vector3();
+let gazeCooldown = 0;
+let gazeKey = null;
+let lastWallSide = 0;
+
+function hideGaze() {
+  const el = document.getElementById('gaze-label');
+  const ch = document.getElementById('crosshair');
+  gazeKey = null;
+  if (el) el.hidden = true;
+  if (ch) ch.classList.remove('over');
+}
+
+function updateGaze(now) {
+  if (!nav || nav.mode !== 'walk' || (!nav.locked && !isTouch)) { hideGaze(); return; }
+  if (now < gazeCooldown) return;
+  gazeCooldown = now + 90;
+  camera.getWorldDirection(gazeDir);
+  gazeRay.set(camera.position, gazeDir);
+  gazeRay.far = 3.6;          // 手が届く範囲だけ
+  const hits = gazeRay.intersectObjects(state.hotspots, true);
+  let found = null;
+  for (const h of hits) {
+    if (h.object.visible === false) continue;
+    const k = findHotspot(h.object);
+    if (k) { found = k; break; }
+  }
+  if (found === gazeKey) return;
+  gazeKey = found;
+  const el = document.getElementById('gaze-label');
+  const ch = document.getElementById('crosshair');
+  if (found) {
+    el.innerHTML = `${HOTSPOT_NAMES[found] || found}<span class="gk">E</span>`;
+    el.hidden = false;
+    ch.classList.add('over');
+  } else {
+    hideGaze();
+  }
+}
+
+/** 「調べる」操作（E キー、またはロック中のクリック） */
+function interact() {
+  if (!nav || nav.mode !== 'walk') return false;
+  if (gazeKey) { hotspotCard.show(gazeKey); setLockUI(nav.locked); return true; }
+  // 照準が合っていなくても、目の前のホットスポットを探してみる
+  camera.getWorldDirection(gazeDir);
+  gazeRay.set(camera.position, gazeDir);
+  gazeRay.far = 3.6;
+  const hits = gazeRay.intersectObjects(state.hotspots, true);
+  for (const h of hits) {
+    if (h.object.visible === false) continue;
+    const k = findHotspot(h.object);
+    if (k) { hotspotCard.show(k); setLockUI(nav.locked); return true; }
+  }
+  hotspotCard.hide();
+  setLockUI(nav.locked);
+  return false;
+}
+
+/* --- 「見えない壁」を横切ったときのギミック --- */
+const WALL_X = -0.05;   // buildInvisibleWall() の位置
+let wallCooldown = 0;
+
+function wallSideOf(x) {
+  return x < WALL_X ? -1 : 1;
+}
+
+function checkInvisibleWall(t) {
+  if (!nav || nav.mode !== 'walk') return;
+  const p = nav.position;
+  if (p.x < WALL.corridor) return;         // 廊下にいるときは対象外
+  const side = wallSideOf(p.x);
+  if (side === lastWallSide) return;
+  lastWallSide = side;
+  if (t < wallCooldown) return;
+  wallCooldown = t + 14;
+  hotspotCard.show('wall');
+  setLockUI(nav.locked);
+}
+
 function setToggle(id, on) {
   state.toggles[id] = on;
-  if (id === 'orbit') controls.autoRotate = on;
+  if (id === 'orbit') controls.autoRotate = on && state.mode !== 'walk';
   if (id === 'shaft') {
     lighting.shaftMat.opacity = on ? 0.11 * (state.time.shaft ?? 1) : 0;
   }
@@ -403,6 +565,15 @@ canvas.addEventListener('pointerup', (e) => {
   const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
   downPos = null;
   if (moved > 6) return; // ドラッグ中は無視
+
+  // 一人称モード：ロック前のクリックは「ロック要求」なので inspected しない。
+  // ロック中は画面中央（照準）で判定する
+  if (nav && nav.mode === 'walk') {
+    if (!nav.locked) return;
+    interact();
+    return;
+  }
+
   pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
   pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
@@ -415,9 +586,25 @@ canvas.addEventListener('pointerup', (e) => {
   hotspotCard.hide();
 });
 
+/* タッチ端末：軽くタップしたら「調べる」（Pointer Lock が無いぶんの代替） */
+let tapStart = null;
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch') return;
+  tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+});
+canvas.addEventListener('pointerup', (e) => {
+  if (!tapStart || e.pointerType !== 'touch') return;
+  const moved = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
+  const held = performance.now() - tapStart.t;
+  tapStart = null;
+  if (moved < 14 && held < 320 && nav && nav.mode === 'walk') interact();
+});
+
 let hoverCooldown = 0;
 canvas.addEventListener('pointermove', (e) => {
   const now = performance.now();
+  // 一人称でロック中はマウスカーソルが動かないので、ホバー判定はしない
+  if (nav && nav.mode === 'walk' && nav.locked) return;
   if (now < hoverCooldown) return;
   hoverCooldown = now + 60;
   pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -446,7 +633,7 @@ const HOTSPOT_NAMES = {
   phone: 'スマートフォン', charger: '充電器', tieNavy: '紺のネクタイ',
   tieWine: 'えんじのネクタイ', astroBook: '天文学の本', mop: 'モップとバケツ',
   notice: '掲示板', shelf: '開いた棚', clock: '時計', teacherDesk: '教卓',
-  bottle: '水筒', camera: '配信カメラ',
+  bottle: '水筒', camera: '配信カメラ', wall: '見えない壁',
 };
 
 /* 窓そのものもホットスポットにする（窓ガラスには直接 userData を付けていないため） */
@@ -494,10 +681,15 @@ function animate() {
     controls.target.lerpVectors(tween.fromT, tween.toT, e);
   }
 
-  controls.update();
+  if (nav && nav.mode === 'walk') {
+    // 一人称：歩行・視線・「見えない壁」の判定
+    nav.update(dt);
+    updateGaze(performance.now());
+    checkInvisibleWall(t);
+  } else if (controls.enabled) {
+    controls.update();
 
-  // 注視点が教室の外へ飛ばないように（「やや狭い」教室の外側へは行かせない）
-  {
+    // 注視点が教室の外へ飛ばないように（「やや狭い」教室の外側へは行かせない）
     const t2 = controls.target;
     t2.x = clamp(t2.x, -ROOM.w / 2 + 0.3, ROOM.w / 2 + 1.2);
     t2.y = clamp(t2.y, 0.15, ROOM.h - 0.15);
@@ -550,5 +742,5 @@ boot().catch((e) => {
 });
 
 /* デバッグ用：コンソールから触れるようにしておく */
-window.__scene = () => ({ scene, camera, controls, renderer, world, furniture, props, lighting, state });
+window.__scene = () => ({ scene, camera, controls, renderer, world, furniture, props, lighting, nav, state });
 void deg; void clamp; void DESK;

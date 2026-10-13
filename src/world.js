@@ -428,6 +428,7 @@ function buildCorridor(M) {
 
   // --- 自販機（コーンスープが「無い」）---
   const vg = new THREE.Group();
+  vg.name = 'vending';
   vg.position.set(x1 + 0.42, 0, 1.85);
   vg.rotation.y = Math.PI / 2; // 面板を +X（教室側）に向ける
   const panel = new THREE.MeshStandardMaterial({
@@ -452,7 +453,8 @@ function buildCorridor(M) {
   vg.add(base);
   g.add(HS(vg, 'vending'));
 
-  return { group: g, vendingPanel: panel, ledMat };
+  // vending は一人称モードの当たり判定にも使う（nav.js）
+  return { group: g, vendingPanel: panel, ledMat, vending: vg };
 }
 
 /* ================================================================== */

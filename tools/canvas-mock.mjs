@@ -114,12 +114,21 @@ export function installDom() {
   };
   try {
     Object.defineProperty(globalThis, 'navigator', {
-      value: { userAgent: 'node', clipboard: { writeText: async () => {} } }, configurable: true,
+      value: { userAgent: 'node', maxTouchPoints: 0, clipboard: { writeText: async () => {} } },
+      configurable: true,
     });
   } catch (e) { void e; }
   globalThis.performance = globalThis.performance || { now: () => Date.now() };
   globalThis.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 16);
   globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
+  // 一人称モード（nav.js）が window / document にイベントを張るので、受け皿を用意する
+  const noop = () => {};
+  globalThis.addEventListener = globalThis.addEventListener || noop;
+  globalThis.removeEventListener = globalThis.removeEventListener || noop;
+  globalThis.matchMedia = globalThis.matchMedia || (() => ({ matches: false, addEventListener: noop }));
+  if (globalThis.navigator && globalThis.navigator.maxTouchPoints === undefined) {
+    try { globalThis.navigator.maxTouchPoints = 0; } catch (e) { void e; }
+  }
   globalThis.HTMLCanvasElement = function () {};
   globalThis.ImageData = function (w, h) {
     this.data = new Uint8ClampedArray(w * h * 4); this.width = w; this.height = h;

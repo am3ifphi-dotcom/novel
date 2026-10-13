@@ -42,16 +42,30 @@
   </div>
 </header>
 
-<!-- ========== 操作ヒント ========== -->
+<!-- ========== 操作ヒント（モードによって中身を差し替える） ========== -->
 <div id="hint">
-  <span>ドラッグ＝見回す</span><span>ホイール＝寄る／引く</span><span>右ドラッグ＝移動</span><span class="accent">クリック＝調べる</span>
+  <span>WASD＝歩く</span><span>マウス＝見回す</span><span>Shift＝小走り</span><span>C＝しゃがむ</span><span class="accent">E＝調べる</span>
 </div>
 
+<!-- ========== 一人称：照準・注視ラベル・ロック案内 ========== -->
+<div id="crosshair" hidden aria-hidden="true"><span></span></div>
+<div id="gaze-label" hidden></div>
+<button type="button" id="lock-prompt" hidden>
+  <span class="lp-key">画面をクリック</span>すると歩けます<span class="lp-sub">（Esc で視点を離す）</span>
+</button>
+
 <!-- ========== 視点プリセット（左下） ========== -->
-<nav id="panel-views" aria-label="視点プリセット">
+<nav id="panel-views" aria-label="視点とモード">
+  <div class="pnl-block">
+    <div class="pnl-head">移動モード</div>
+    <div class="row" id="mode-buttons"></div>
+  </div>
   <div class="pnl-head">視点</div>
   <div id="view-buttons"></div>
 </nav>
+
+<!-- ========== タッチ操作（移動スティック） ========== -->
+<div id="touch-stick" hidden aria-hidden="true"><div class="ts-knob"></div></div>
 
 <!-- ========== ギミック（右下） ========== -->
 <section id="panel-controls" aria-label="時間帯とギミック">

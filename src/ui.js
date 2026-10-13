@@ -8,6 +8,28 @@ import { ASSET_LOG, ASSET_PLAN, HDRI_PLAN, GLTF_PLAN, BUDGET_BYTES } from './ass
 const $ = (id) => document.getElementById(id);
 
 /* ------------------------------------------------------------------ */
+/* 操作ヒント（移動モードで中身を差し替える）                            */
+/* ------------------------------------------------------------------ */
+const HINTS = {
+  walk: [
+    ['WASD／矢印', '歩く'], ['マウス', '見回す'], ['Shift', '小走り'],
+    ['C', 'しゃがむ'], ['E／クリック', '調べる'], ['Esc', '視点を離す'],
+  ],
+  orbit: [
+    ['ドラッグ', '見回す'], ['ホイール', '寄る／引く'], ['右ドラッグ', '移動'],
+    ['クリック', '調べる'],
+  ],
+};
+
+function setHint(mode) {
+  const el = $('hint');
+  if (!el) return;
+  const list = HINTS[mode] || HINTS.walk;
+  el.innerHTML = list.map(([k, v], i) =>
+    `<span${i === list.length - 1 ? ' class="accent"' : ''}>${k}＝${v}</span>`).join('');
+}
+
+/* ------------------------------------------------------------------ */
 /* ローディング                                                        */
 /* ------------------------------------------------------------------ */
 export function initLoading(onSkip) {
@@ -47,6 +69,27 @@ export function initLoading(onSkip) {
 /* 視点／時間帯／黒板／ギミック                                         */
 /* ------------------------------------------------------------------ */
 export function initPanels(handlers) {
+  /* --- 移動モード（一人称＝歩く ／ 俯瞰＝見渡す） --- */
+  const mwrap = $('mode-buttons');
+  const modes = [
+    { id: 'walk', label: '歩く（一人称）' },
+    { id: 'orbit', label: '見渡す（俯瞰）' },
+  ];
+  const mbtns = modes.map((m) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bbtn';
+    b.textContent = m.label;
+    b.addEventListener('click', () => {
+      mbtns.forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      handlers.onMode(m.id);
+    });
+    mwrap.appendChild(b);
+    return b;
+  });
+  mbtns[0].classList.add('active');
+
   /* --- 視点 --- */
   const vwrap = $('view-buttons');
   const vbtns = VIEWS.map((v) => {
@@ -122,6 +165,11 @@ export function initPanels(handlers) {
   gbtns[2].classList.add('active');
 
   return {
+    setMode(id) {
+      const i = modes.findIndex((m) => m.id === id);
+      mbtns.forEach((b, k) => b.classList.toggle('active', k === i));
+      setHint(id);
+    },
     setView(id) {
       const i = VIEWS.findIndex((v) => v.id === id);
       vbtns.forEach((b, k) => b.classList.toggle('active', k === i));
@@ -194,10 +242,13 @@ export function initHoverLabel() {
 /* ------------------------------------------------------------------ */
 /* モーダル                                                            */
 /* ------------------------------------------------------------------ */
-export function initModal() {
+export function initModal(onClose) {
   const modal = $('modal');
   const body = $('modal-body');
-  const close = () => { modal.hidden = true; };
+  const close = () => {
+    modal.hidden = true;
+    onClose && onClose();
+  };
   $('modal-close').addEventListener('click', close);
   modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
@@ -230,11 +281,17 @@ export function buildHelpHTML() {
     </table>
     <h3>遊び方</h3>
     <ul>
-      <li><b>視点</b>（左下）… 原作の象徴的な場面へカメラが移動します。時間帯も連動します。</li>
+      <li><b>歩く（一人称）</b>… 既定のモードです。教室の中を自分の足で歩けます。
+        <br><span class="mono">WASD／矢印キー</span>＝歩く　<span class="mono">マウス</span>＝見回す　<span class="mono">Shift</span>＝小走り　<span class="mono">C</span>＝しゃがむ　<span class="mono">E</span>＝調べる　<span class="mono">Esc</span>＝視点を離す</li>
+      <li><b>見渡す（俯瞰）</b>… ドラッグで見回す従来の観察モードです。全景を見たいときに切り替えてください。</li>
+      <li><b>廊下に出られます</b>… 黒板わきの前扉は少し開いています。廊下まで歩くと、コーンスープの「無い」自販機の前に立てます。</li>
+      <li><b>視点</b>（左下）… 原作の象徴的な場面へ移動します。時間帯も連動します。</li>
       <li><b>時間帯</b>（右下）… 火曜三限 → 金曜五限 → 放課後 → 夜。太陽の角度・色温度・露出が変わります。</li>
       <li><b>黒板</b>（右下）… 「味噌」／河岸段丘の断面図／零の数学の3状態を切り替えます。</li>
-      <li><b>クリック</b> … 机の引き出し・自販機・電線・忘れ物など、原作に出てくる物を調べると引用が出ます。</li>
-      <li><b>見えない壁</b> … 内進（紺）と理数科（えんじ）の「偏差値十の差」を可視化します。</li>
+      <li><b>調べる</b> … 机の引き出し・自販機・電線・忘れ物など、原作に出てくる物に照準を合わせて
+        <span class="mono">E</span>（またはクリック）すると引用が出ます。</li>
+      <li><b>見えない壁</b> … 内進（紺）と理数科（えんじ）の「偏差値十の差」を可視化します。
+        <br>一人称モードで教室の中央を横切ると、そのことについての一文が差し込まれます。</li>
     </ul>
     <h3>「人の気配」</h3>
     <p>キャラクターは配置していません。代わりに——引かれた椅子、忘れた充電器、開いた棚、
