@@ -1,0 +1,164 @@
+{
+  "generatedAt": "2026-10-13T04:23:06.726Z",
+  "source": "Poly Haven (CC0 1.0)",
+  "groups": {
+    "floor_wood": {
+      "asset": "wood_floor_deck",
+      "url": "https://polyhaven.com/a/wood_floor_deck",
+      "license": "CC0 1.0",
+      "via": "alexbieber/GTA-mini/assets/pbr/wood_floor_deck",
+      "maps": {
+        "diff": {
+          "file": "textures/floor_wood/diff.webp",
+          "px": "1024x1024",
+          "bytes": 168650,
+          "src": "wood_floor_deck_diff_1k.jpg @alexbieber/GTA-mini"
+        },
+        "nor": {
+          "file": "textures/floor_wood/nor.webp",
+          "px": "1024x1024",
+          "bytes": 48844,
+          "src": "wood_floor_deck_nor_1k.jpg @alexbieber/GTA-mini"
+        },
+        "rough": {
+          "file": "textures/floor_wood/rough.webp",
+          "px": "512x512",
+          "bytes": 23414,
+          "src": "wood_floor_deck_rough_1k.jpg @alexbieber/GTA-mini"
+        }
+      }
+    },
+    "wall_plaster": {
+      "asset": "painted_plaster_wall",
+      "url": "https://polyhaven.com/a/painted_plaster_wall",
+      "license": "CC0 1.0",
+      "via": "alexbieber/GTA-mini/assets/pbr/painted_plaster_wall",
+      "maps": {
+        "diff": {
+          "file": "textures/wall_plaster/diff.webp",
+          "px": "1024x1024",
+          "bytes": 119552,
+          "src": "painted_plaster_wall_diff_1k.jpg @alexbieber/GTA-mini"
+        },
+        "nor": {
+          "file": "textures/wall_plaster/nor.webp",
+          "px": "1024x1024",
+          "bytes": 151938,
+          "src": "painted_plaster_wall_nor_1k.jpg @alexbieber/GTA-mini"
+        },
+        "rough": {
+          "file": "textures/wall_plaster/rough.webp",
+          "px": "512x512",
+          "bytes": 854,
+          "src": "painted_plaster_wall_rough_1k.jpg @alexbieber/GTA-mini"
+        }
+      }
+    },
+    "ceiling": {
+      "asset": "beige_wall_001",
+      "url": "https://polyhaven.com/a/beige_wall_001",
+      "license": "CC0 1.0",
+      "via": "alexbieber/GTA-mini/assets/pbr/beige_wall_001",
+      "maps": {
+        "diff": {
+          "file": "textures/ceiling/diff.webp",
+          "px": "512x512",
+          "bytes": 794,
+          "src": "beige_wall_001_diff_1k.jpg @alexbieber/GTA-mini"
+        },
+        "rough": {
+          "file": "textures/ceiling/rough.webp",
+          "px": "256x256",
+          "bytes": 602,
+          "src": "beige_wall_001_rough_1k.jpg @alexbieber/GTA-mini"
+        }
+      }
+    },
+    "metal_plate": {
+      "asset": "metal_plate",
+      "url": "https://polyhaven.com/a/metal_plate",
+      "license": "CC0 1.0",
+      "via": "alexbieber/GTA-mini/assets/pbr/metal_plate",
+      "maps": {
+        "diff": {
+          "file": "textures/metal_plate/diff.webp",
+          "px": "512x512",
+          "bytes": 23038,
+          "src": "metal_plate_diff_1k.jpg @alexbieber/GTA-mini"
+        },
+        "nor": {
+          "file": "textures/metal_plate/nor.webp",
+          "px": "512x512",
+          "bytes": 26584,
+          "src": "metal_plate_nor_1k.jpg @alexbieber/GTA-mini"
+        },
+        "rough": {
+          "file": "textures/metal_plate/rough.webp",
+          "px": "256x256",
+          "bytes": 17172,
+          "src": "metal_plate_rough_1k.jpg @alexbieber/GTA-mini"
+        }
+      }
+    },
+    "metal_rust": {
+      "asset": "green_metal_rust",
+      "url": "https://polyhaven.com/a/green_metal_rust",
+      "license": "CC0 1.0",
+      "via": "alexbieber/GTA-mini/assets/pbr/green_metal_rust",
+      "maps": {
+        "diff": {
+          "file": "textures/metal_rust/diff.webp",
+          "px": "512x512",
+          "bytes": 4786,
+          "src": "green_metal_rust_diff_1k.jpg @alexbieber/GTA-mini"
+        },
+        "rough": {
+          "file": "textures/metal_rust/rough.webp",
+          "px": "256x256",
+          "bytes": 870,
+          "src": "green_metal_rust_rough_1k.jpg @alexbieber/GTA-mini"
+        }
+      }
+    },
+    "wood_oak": {
+      "asset": "oak_veneer_01",
+      "url": "https://polyhaven.com/a/oak_veneer_01",
+      "license": "CC0 1.0",
+      "via": "dyeoh/furniture_placement_simulator/game/assets/textures/oak_veneer_01",
+      "maps": {
+        "diff": {
+          "file": "textures/wood_oak/diff.webp",
+          "px": "1024x1024",
+          "bytes": 76620,
+          "src": "oak_veneer_01_diff_1k.jpg @dyeoh/furniture_placement_simulator"
+        },
+        "rough": {
+          "file": "textures/wood_oak/rough.webp",
+          "px": "256x256",
+          "bytes": 11042,
+          "src": "oak_veneer_01_rough_1k.jpg @dyeoh/furniture_placement_simulator"
+        }
+      }
+    },
+    "concrete": {
+      "asset": "cracked_concrete_wall",
+      "url": "https://polyhaven.com/a/cracked_concrete_wall",
+      "license": "CC0 1.0",
+      "via": "alexbieber/GTA-mini/assets/pbr/cracked_concrete_wall",
+      "maps": {
+        "diff": {
+          "file": "textures/concrete/diff.webp",
+          "px": "512x512",
+          "bytes": 61744,
+          "src": "cracked_concrete_wall_diff_1k.jpg @alexbieber/GTA-mini"
+        },
+        "rough": {
+          "file": "textures/concrete/rough.webp",
+          "px": "256x256",
+          "bytes": 3748,
+          "src": "cracked_concrete_wall_rough_1k.jpg @alexbieber/GTA-mini"
+        }
+      }
+    }
+  }
+}

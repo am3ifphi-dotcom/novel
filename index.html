@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>偏差値60の教室から✝本質✝が漏れ出している件について — 3D教室</title>
+<meta name="description" content="『偏差値60の教室から✝本質✝が漏れ出している件について』の世界観で再構成したインタラクティブ3D教室（three.js）">
+<style>
+  :root{
+    --bg:#0d1013; --panel:rgba(18,22,26,.74); --panel-line:rgba(255,255,255,.10);
+    --ink:#eceff2; --ink-dim:#a9b2ba; --accent:#e0a45c; --accent-2:#7fa6cf; --red:#e0524d;
+    --jp: "Hiragino Kaku Gothic ProN","Yu Gothic","YuGothic","Noto Sans JP","Meiryo","MS PGothic",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--jp);
+    overflow:hidden; -webkit-font-smoothing:antialiased;
+  }
+  #app{position:fixed; inset:0}
+  #scene{position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none}
+  /* 画面の縁を落とす薄いビネット（ポストプロセス無しで奥行きを出す） */
+  #vignette{
+    position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(115% 85% at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,.34) 100%);
+    mix-blend-mode:multiply;
+  }
+  .hud{
+    position:absolute; background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:12px; padding:10px 12px; backdrop-filter:blur(9px) saturate(120%);
+    box-shadow:0 8px 30px rgba(0,0,0,.35); font-size:12.5px; line-height:1.55;
+  }
+  .hud.hidden{display:none}
+  .hud-label{font-size:10.5px; letter-spacing:.14em; color:var(--ink-dim); margin-bottom:6px; text-transform:uppercase}
+
+  /* 上: タイトル */
+  .hud-top{left:14px; top:14px; right:auto; max-width:min(560px,52vw); background:linear-gradient(180deg, rgba(18,22,26,.82), rgba(18,22,26,.62))}
+  .hud-top h1{margin:0 0 4px; font-size:15.5px; font-weight:700; letter-spacing:.01em}
+  .hud-top h1 .cross{color:var(--red); font-weight:700; padding:0 1px}
+  .hud-top .sub{margin:0; font-size:11.5px; color:var(--ink-dim)}
+
+  /* 左上: 場面解説 */
+  .hud-note{left:14px; top:96px; max-width:min(430px,46vw)}
+  .note-time{color:var(--accent); font-size:11.5px; letter-spacing:.04em; margin-bottom:4px}
+  .note-quote{font-size:12px; color:#dfe5ea; border-left:2px solid rgba(224,164,92,.55); padding-left:8px}
+
+  /* 左下: 視点プリセット */
+  .hud-presets{left:14px; bottom:14px; width:min(330px,52vw)}
+  .preset-list{display:grid; gap:5px}
+  .preset{
+    display:flex; align-items:center; gap:9px; width:100%; text-align:left; cursor:pointer;
+    background:rgba(255,255,255,.045); color:var(--ink); border:1px solid rgba(255,255,255,.09);
+    border-radius:9px; padding:7px 9px; font-family:inherit; font-size:12.2px; transition:.16s;
+  }
+  .preset:hover{background:rgba(224,164,92,.16); border-color:rgba(224,164,92,.45); transform:translateX(2px)}
+  .preset.active{background:rgba(224,164,92,.24); border-color:var(--accent)}
+  .preset .k{
+    display:inline-flex; width:18px; height:18px; border-radius:5px; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.10); font-size:10.5px; color:var(--ink-dim); flex:0 0 auto
+  }
+  .preset.active .k{background:var(--accent); color:#20160a; font-weight:700}
+
+  /* 右下: ギミック */
+  .hud-gimmicks{right:14px; bottom:14px; width:min(330px,52vw); max-height:calc(100vh - 210px); overflow:auto}
+  .tgl{display:flex; align-items:center; gap:8px; padding:4px 2px; cursor:pointer; font-size:12.2px}
+  .tgl input{accent-color:var(--accent); width:15px; height:15px; flex:0 0 auto}
+  .tgl-range{gap:10px}
+  .tgl-range input{width:100%; accent-color:var(--accent-2)}
+  .tgl-val{font-variant-numeric:tabular-nums; color:var(--accent-2); font-size:11.5px; min-width:42px; text-align:right}
+
+  /* 右上: 計測 */
+  .hud-stats{right:14px; top:14px; min-width:230px; font-variant-numeric:tabular-nums}
+  .hud-stats b{color:var(--accent)}
+  .stats-assets{color:var(--ink-dim); font-size:11px}
+
+  /* 操作説明 */
+  .hud-help{
+    left:50%; transform:translateX(-50%); bottom:14px; max-width:min(720px,60vw);
+    font-size:11.5px; color:#cfd6dc; text-align:center; background:rgba(16,19,22,.66)
+  }
+  .hud-help b{color:var(--accent-2)}
+
+  /* トースト */
+  .toast{
+    position:absolute; left:50%; top:16px; transform:translate(-50%,-16px);
+    background:rgba(20,24,28,.9); border:1px solid rgba(224,164,92,.4); color:#f2f4f6;
+    padding:9px 14px; border-radius:10px; font-size:12.5px; max-width:min(680px,72vw);
+    opacity:0; pointer-events:none; transition:.28s; z-index:30; box-shadow:0 10px 32px rgba(0,0,0,.4)
+  }
+  .toast.show{opacity:1; transform:translate(-50%,0)}
+
+  /* オーバーレイ（ローディング・エラー） */
+  .overlay{
+    position:absolute; inset:0; display:grid; place-items:center; z-index:40;
+    background:radial-gradient(120% 90% at 50% 40%, #1b2126 0%, #0b0e11 70%);
+  }
+  .overlay.hidden{display:none}
+  .load-inner{width:min(620px,86vw); text-align:center}
+  .load-title{font-size:19px; font-weight:700; letter-spacing:.02em; margin-bottom:18px}
+  .load-title .cross{color:var(--red)}
+  .load-bar{height:4px; background:rgba(255,255,255,.10); border-radius:3px; overflow:hidden}
+  .load-bar i{display:block; height:100%; width:2%; background:linear-gradient(90deg,var(--accent-2),var(--accent)); transition:width .3s}
+  .load-status{margin-top:10px; font-size:12.5px; color:#cfd6dc}
+  .load-tip{margin-top:14px; font-size:11.5px; color:var(--ink-dim); line-height:1.8}
+  .fatal-msg{color:#ffd9d7; font-size:13px; word-break:break-word}
+  .fatal-actions{display:flex; gap:10px; justify-content:center; margin-top:16px}
+  .fatal-actions button{
+    font-family:inherit; font-size:12.5px; padding:9px 16px; border-radius:9px; cursor:pointer;
+    background:rgba(224,164,92,.2); color:var(--ink); border:1px solid rgba(224,164,92,.5)
+  }
+  .fatal-actions button:hover{background:rgba(224,164,92,.32)}
+  #boot-error{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#ffd9d7; z-index:60}
+
+  /* クレジット */
+  .credit{
+    position:absolute; right:14px; top:calc(14px + 106px); font-size:10.5px; color:rgba(200,208,214,.62);
+    text-align:right; line-height:1.7; pointer-events:none
+  }
+  .credit a{color:inherit}
+
+  @media (max-width:820px){
+    .hud-note{display:none}
+    .hud-presets{width:min(260px,68vw)}
+    .hud-gimmicks{width:min(240px,60vw); max-height:44vh}
+    .hud-help{display:none}
+    .hud-top{max-width:70vw}
+    .hud-stats{font-size:11px; min-width:0}
+    .credit{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+  <div id="vignette"></div>
+  <div class="credit">
+    Poly Haven (CC0) ／ Khronos glTF-Sample-Assets ／ three.js (MIT)<br>
+    『偏差値60の教室から✝本質✝が漏れ出している件について』より
+  </div>
+  <div id="boot-error" class="hidden"></div>
+</div>
+
+<noscript>
+  <div style="position:fixed;inset:0;display:grid;place-items:center;background:#0b0e11;color:#eceff2;font-family:sans-serif">
+    この3D教室の表示には JavaScript が必要です。
+  </div>
+</noscript>
+
+<script>
+/*
+ * importmap を「ローカルの vendor が無い場合のみ」CDN に倒す。
+ * これにより CDN 障害時も、逆に vendor 欠落時も白画面にならない。
+ */
+(async () => {
+  const local = './assets/vendor/';
+  let ok = false;
+  try {
+    const res = await fetch(local + 'three.module.js', { method: 'HEAD' });
+    ok = res.ok;
+  } catch (e) { ok = false; }
+
+  const map = ok
+    ? { imports: { three: local + 'three.module.js', 'three/addons/': local + 'addons/' } }
+    : { imports: {
+        three: 'https://unpkg.com/three@0.170.0/build/three.module.min.js',
+        'three/addons/': 'https://unpkg.com/three@0.170.0/examples/jsm/',
+      } };
+
+  const s = document.createElement('script');
+  s.type = 'importmap';
+  s.textContent = JSON.stringify(map);
+  document.head.appendChild(s);
+  if (!ok) console.warn('【代替】ローカルの three が見つからないため CDN から読み込みます（オフラインでは動作しません）');
+
+  try {
+    await import('./src/main.js');
+  } catch (err) {
+    console.error(err);
+    const box = document.getElementById('boot-error');
+    box.classList.remove('hidden');
+    box.innerHTML = '起動に失敗しました: ' + (err && err.message ? err.message : err) +
+      '<br><span style="font-size:12px;opacity:.8">ローカルサーバ（例: python3 -m http.server）経由で開いてください。file:// では fetch が制限されます。</span>';
+  }
+})();
+</script>
+</body>
+</html>
