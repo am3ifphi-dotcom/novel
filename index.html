@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>偏差値60の教室から✝本質✝が漏れ出している件について ─ 桐葉高校 北棟 理数科B組</title>
+<meta name="description" content="gensaku.txt の世界観を three.js で再現したインタラクティブ3D教室。桐葉高校 北棟2階 理数科B組／金曜五限。" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+<canvas id="scene" aria-label="3D教室"></canvas>
+
+<!-- ========== ローディング ========== -->
+<div id="loading" role="status" aria-live="polite">
+  <div class="ld-inner">
+    <div class="ld-mark" aria-hidden="true"></div>
+    <h1 class="ld-title">偏差値60の教室から<span class="ess">✝本質✝</span>が漏れ出している件について</h1>
+    <p class="ld-place">桐葉高校 北棟2階 ・ 理数科B組 ／ 金曜五限</p>
+    <div class="ld-bar"><div class="ld-fill" id="bar-fill"></div></div>
+    <p class="ld-status" id="load-status">準備中…</p>
+    <button class="ld-skip" id="load-skip" type="button" hidden>取得を待たずに開始する</button>
+    <p class="ld-note">外部アセット（Poly Haven / Khronos glTF）は取得できない場合、すべてプロシージャルに差し替えます。</p>
+  </div>
+</div>
+
+<!-- ========== 起動失敗時の予備 ========== -->
+<div id="fatal" hidden>
+  <div class="fatal-inner">
+    <h2>起動できませんでした</h2>
+    <p id="fatal-msg"></p>
+    <button type="button" onclick="location.reload()">再読み込み</button>
+  </div>
+</div>
+
+<!-- ========== 表題 ========== -->
+<header id="title-card">
+  <div class="tc-mark" aria-hidden="true"></div>
+  <div class="tc-text">
+    <div class="tc-title">偏差値60の教室から<span class="ess">✝本質✝</span>が漏れ出している件について</div>
+    <div class="tc-sub">桐葉高校 北棟2階 ・ 理数科B組<span class="sep">／</span><span id="tc-time">金曜五限</span></div>
+  </div>
+</header>
+
+<!-- ========== 操作ヒント ========== -->
+<div id="hint">
+  <span>ドラッグ＝見回す</span><span>ホイール＝寄る／引く</span><span>右ドラッグ＝移動</span><span class="accent">クリック＝調べる</span>
+</div>
+
+<!-- ========== 視点プリセット（左下） ========== -->
+<nav id="panel-views" aria-label="視点プリセット">
+  <div class="pnl-head">視点</div>
+  <div id="view-buttons"></div>
+</nav>
+
+<!-- ========== ギミック（右下） ========== -->
+<section id="panel-controls" aria-label="時間帯とギミック">
+  <div class="pnl-block">
+    <div class="pnl-head">時間帯</div>
+    <div class="row" id="time-buttons"></div>
+  </div>
+  <div class="pnl-block">
+    <div class="pnl-head">黒板</div>
+    <div class="row" id="board-buttons"></div>
+  </div>
+  <div class="pnl-block">
+    <div class="pnl-head">ギミック</div>
+    <div class="row" id="toggle-buttons"></div>
+  </div>
+  <div class="pnl-block pnl-foot">
+    <button type="button" id="btn-report" class="ghost">採用アセット一覧</button>
+    <button type="button" id="btn-help" class="ghost">このsceneについて</button>
+  </div>
+</section>
+
+<!-- ========== ホットスポットの引用カード ========== -->
+<div id="hotspot-card" hidden>
+  <button class="hc-close" id="hc-close" type="button" aria-label="閉じる">×</button>
+  <div class="hc-name" id="hc-name"></div>
+  <div class="hc-title" id="hc-title"></div>
+  <blockquote class="hc-body" id="hc-body"></blockquote>
+  <div class="hc-src" id="hc-src"></div>
+</div>
+
+<!-- ========== モーダル ========== -->
+<div id="modal" hidden>
+  <div class="modal-inner">
+    <button class="modal-close" id="modal-close" type="button" aria-label="閉じる">×</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- ========== ホバーラベル ========== -->
+<div id="hover-label" hidden></div>
+
+<script>
+/**
+ * three.js の CDN を実行時に切り替えられるよう、importmap を動的生成する。
+ * （jsdelivr → unpkg の順に到達確認。どちらも駄目なら jsdelivr で試す）
+ * さらに 25 秒経っても起動しなければ予備画面を出す＝白画面回避。
+ */
+(function () {
+  var CDNS = [
+    'https://cdn.jsdelivr.net/npm/three@0.170.0/',
+    'https://unpkg.com/three@0.170.0/'
+  ];
+  var booted = false;
+  window.__bootOK = function () { booted = true; clearTimeout(fatalTimer); };
+
+  function showFatal(msg) {
+    if (booted) return;
+    var el = document.getElementById('fatal');
+    document.getElementById('fatal-msg').textContent = msg || '';
+    el.hidden = false;
+    var ld = document.getElementById('loading');
+    if (ld) ld.hidden = true;
+  }
+  window.__showFatal = showFatal;
+
+  var fatalTimer = setTimeout(function () {
+    showFatal('three.js を CDN から読み込めませんでした。ネットワーク（cdn.jsdelivr.net / unpkg.com）をご確認ください。');
+  }, 25000);
+
+  function boot(base) {
+    var im = document.createElement('script');
+    im.type = 'importmap';
+    im.textContent = JSON.stringify({
+      imports: {
+        'three': base + 'build/three.module.js',
+        'three/addons/': base + 'examples/jsm/'
+      }
+    });
+    document.head.appendChild(im);
+    var s = document.createElement('script');
+    s.type = 'module';
+    s.src = './src/main.js';
+    s.onerror = function () { showFatal('src/main.js を読み込めませんでした。'); };
+    document.body.appendChild(s);
+  }
+
+  function tryNext(i) {
+    if (i >= CDNS.length) { boot(CDNS[0]); return; }
+    var ctrl = new AbortController();
+    var to = setTimeout(function () { ctrl.abort(); }, 6000);
+    fetch(CDNS[i] + 'package.json', { signal: ctrl.signal, cache: 'force-cache' })
+      .then(function (r) {
+        clearTimeout(to);
+        if (r.ok) boot(CDNS[i]); else tryNext(i + 1);
+      })
+      .catch(function () { clearTimeout(to); tryNext(i + 1); });
+  }
+  tryNext(0);
+})();
+</script>
+</body>
+</html>

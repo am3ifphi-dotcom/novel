@@ -1,0 +1,12 @@
+# 開発用スモークテストの一時ディレクトリ
+tools/.tmp/
+
+# 依存（本番は importmap + CDN なので不要）
+node_modules/
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
