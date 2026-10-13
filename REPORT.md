@@ -199,7 +199,15 @@ URL パターン: `https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/{id}_1k.
 | 透過 | ガラス・光の筋・埃のみ。`depthWrite = false` |
 | 期待fps | 統合GPUでも 60fps 見込み（≈25k 三角形／≈180 ドローコール／ポストプロセス無し／影は静的1回） |
 
-`npm run smoke` で上記の内訳を、`npm run smoke:views` で各視点プリセットの遮蔽チェックを再実行できます。
+`npm run smoke` で上記の内訳を、`npm run smoke:views` で各視点プリセットの遮蔽チェック、
+`npm run smoke:canvas` で Canvas 引数の回帰テストを再実行できます。
+
+### 開発時の検証について
+
+Node 側スモークテストの Canvas モックは、**本物の Canvas API と同じようにおかしい引数で例外を投げる**
+厳格実装（`tools/canvas-mock.mjs`）です。`addColorStop` の非有限オフセット／範囲外、
+`createLinearGradient` / `createRadialGradient` の NaN・負の半径、`arc` / `ellipse` の負の半径を検出します。
+加えて `npm run smoke` は**全ジオメトリの頂点・UV に NaN が混入していないか**も検査します（179件／異常0件）。
 
 ---
 

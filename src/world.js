@@ -465,8 +465,9 @@ function buildOutdoors(M, sunDir) {
 
   // --- 空のドーム ---
   const skyMat = new THREE.MeshBasicMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
+  // stops は [色, 位置] の順（spec.js の TIMES[].sky と同じ形式）
   skyMat.map = skyTexture(
-    [[0, '#3f79c0'], [0.42, '#8fbde4'], [0.72, '#dbe7ec'], [1, '#e9e4d8']],
+    [['#3f79c0', 0], ['#8fbde4', 0.42], ['#dbe7ec', 0.72], ['#e9e4d8', 1]],
     sunDir, 96, 384
   );
   const dome = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 20), skyMat);

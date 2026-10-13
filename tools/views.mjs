@@ -23,34 +23,9 @@ for (const f of readdirSync(srcDir)) {
   writeFileSync(path.join(work, f), s);
 }
 
-/* DOM mock */
-function makeCtx(canvas) {
-  const noop = () => {}; const grad = { addColorStop: noop };
-  return { canvas, fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textAlign: '', textBaseline: '',
-    globalAlpha: 1, shadowColor: '', shadowBlur: 0, lineCap: '', lineJoin: '', filter: '',
-    save: noop, restore: noop, beginPath: noop, closePath: noop, moveTo: noop, lineTo: noop, arc: noop,
-    ellipse: noop, rect: noop, fill: noop, stroke: noop, fillRect: noop, strokeRect: noop, clearRect: noop,
-    fillText: noop, strokeText: noop, translate: noop, rotate: noop, scale: noop, setTransform: noop,
-    transform: noop, clip: noop, quadraticCurveTo: noop, bezierCurveTo: noop, setLineDash: noop, drawImage: noop, arcTo: noop,
-    measureText: (t) => ({ width: String(t).length * 8 }),
-    createLinearGradient: () => grad, createRadialGradient: () => grad, createPattern: () => null,
-    createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }),
-    getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }), putImageData: noop };
-}
-function makeCanvas(w = 300, h = 150) {
-  const c = { width: w, height: h, style: {}, nodeType: 1, tagName: 'CANVAS', addEventListener() {},
-    removeEventListener() {}, setAttribute() {}, getAttribute() { return null; },
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: w, height: h }), toDataURL: () => 'data:,' };
-  c.getContext = (k) => (k === '2d' ? makeCtx(c) : null);
-  return c;
-}
-globalThis.window = globalThis;
-globalThis.document = { createElement: (t) => (t === 'canvas' ? makeCanvas() : { style: {}, appendChild() {}, setAttribute() {} }),
-  getElementById: () => null, addEventListener() {}, removeEventListener() {}, body: { appendChild() {} }, head: { appendChild() {} } };
-try { Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'node' }, configurable: true }); } catch (e) { void e; }
-globalThis.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 16);
-globalThis.performance = globalThis.performance || { now: () => Date.now() };
-globalThis.fetch = async () => { throw new Error('offline'); };
+/* ---- DOM / Canvas（厳格モック：canvas-mock.mjs に一本化） ---- */
+import { installDom } from './canvas-mock.mjs';
+installDom();
 
 const THREE = await import(shim);
 const TX = await import(path.join(work, 'textures.js'));

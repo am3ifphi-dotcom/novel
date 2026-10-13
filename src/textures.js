@@ -344,12 +344,33 @@ export function normalFromNoise(size = 256, repeat = [4, 4], strength = 1.6, det
 /* ------------------------------------------------------------------ */
 export function skyTexture(stops, sunDir = null, w = 96, h = 384) {
   const { canvas, ctx } = makeCanvas(w, h);
+
+  // グラデーションのストップは [色, 位置] ／ [位置, 色] のどちらの順序でも受け付ける。
+  // 数値でない位置や空の色は黙って捨てる（Canvas の addColorStop は非有限値で例外になるため）。
+  const parsed = (Array.isArray(stops) ? stops : [])
+    .map((s) => {
+      if (!Array.isArray(s) || s.length < 2) return null;
+      const [a, b] = s;
+      const numFirst = typeof a === 'number' && !Number.isNaN(a);
+      const pos = numFirst ? a : b;
+      const color = numFirst ? b : a;
+      if (!Number.isFinite(pos) || typeof color !== 'string' || color === '') return null;
+      return { pos: clamp(pos, 0, 1), color };
+    })
+    .filter(Boolean)
+    .sort((m, n) => m.pos - n.pos);
+
+  // 全部おかしかったときの保険（青空）
+  const list = parsed.length >= 2
+    ? parsed
+    : [{ pos: 0, color: '#3f79c0' }, { pos: 0.5, color: '#a8c8e8' }, { pos: 1, color: '#dfe8ee' }];
+
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  stops.forEach(([c, p]) => g.addColorStop(clamp(p, 0, 1), c));
+  list.forEach((s) => g.addColorStop(s.pos, s.color));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
-  if (sunDir) {
+  if (sunDir && Number.isFinite(sunDir.x + sunDir.y + sunDir.z)) {
     const { x, y } = (function () {
       const d = sunDir.clone().normalize();
       const phi = Math.atan2(d.z, d.x);
@@ -359,6 +380,7 @@ export function skyTexture(stops, sunDir = null, w = 96, h = 384) {
       return { x: u * w, y: (theta / Math.PI) * h };
     })();
     // 水平方向に巻き戻して3回描く（継ぎ目対策）
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return finalizeSky(canvas);
     for (const off of [-w, 0, w]) {
       const rg = ctx.createRadialGradient(x + off, y, 0, x + off, y, h * 0.55);
       rg.addColorStop(0, 'rgba(255,250,232,0.95)');
@@ -369,6 +391,10 @@ export function skyTexture(stops, sunDir = null, w = 96, h = 384) {
       ctx.fillRect(0, 0, w, h);
     }
   }
+  return finalizeSky(canvas);
+}
+
+function finalizeSky(canvas) {
   const t = new THREE.CanvasTexture(canvas);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = THREE.RepeatWrapping;

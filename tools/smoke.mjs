@@ -5,63 +5,9 @@
  */
 import { createRequire } from 'module';
 
-/* ---------------- DOM / Canvas の最小モック ---------------- */
-function makeCtx2D(canvas) {
-  const noop = () => {};
-  const grad = { addColorStop: noop };
-  const ctx = {
-    canvas,
-    fillStyle: '#000', strokeStyle: '#000', lineWidth: 1, font: '10px sans-serif',
-    textAlign: 'left', textBaseline: 'alphabetic', globalAlpha: 1, globalCompositeOperation: 'source-over',
-    shadowColor: '#000', shadowBlur: 0, lineCap: 'butt', lineJoin: 'miter', filter: 'none',
-    save: noop, restore: noop, beginPath: noop, closePath: noop, moveTo: noop, lineTo: noop,
-    arc: noop, ellipse: noop, rect: noop, fill: noop, stroke: noop, fillRect: noop, strokeRect: noop,
-    clearRect: noop, fillText: noop, strokeText: noop, translate: noop, rotate: noop, scale: noop,
-    setTransform: noop, transform: noop, clip: noop, quadraticCurveTo: noop, bezierCurveTo: noop,
-    setLineDash: noop, drawImage: noop, arcTo: noop,
-    measureText: (t) => ({ width: String(t).length * 8 }),
-    createLinearGradient: () => grad,
-    createRadialGradient: () => grad,
-    createPattern: () => null,
-    createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }),
-    getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }),
-    putImageData: noop,
-  };
-  return ctx;
-}
-
-function makeCanvas(w = 300, h = 150) {
-  const c = {
-    width: w, height: h, style: {}, nodeType: 1, tagName: 'CANVAS',
-    addEventListener() {}, removeEventListener() {}, setAttribute() {}, getAttribute() { return null; },
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: w, height: h, right: w, bottom: h }),
-    toDataURL: () => 'data:,',
-  };
-  c.getContext = (kind) => (kind === '2d' ? makeCtx2D(c) : null);
-  return c;
-}
-
-globalThis.self = globalThis;
-globalThis.window = globalThis;
-globalThis.document = {
-  createElement: (tag) => (tag === 'canvas' ? makeCanvas() : { style: {}, appendChild() {}, setAttribute() {} }),
-  createElementNS: () => makeCanvas(),
-  getElementById: () => null,
-  querySelector: () => null,
-  addEventListener() {}, removeEventListener() {},
-  body: { appendChild() {} }, head: { appendChild() {} },
-  documentElement: { style: {} },
-};
-try { Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'node', clipboard: { writeText: async () => {} } }, configurable: true }); } catch (e) { void e; }
-globalThis.performance = globalThis.performance || { now: () => Date.now() };
-globalThis.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 16);
-globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
-globalThis.HTMLCanvasElement = function () {};
-globalThis.OffscreenCanvas = undefined;
-globalThis.ImageData = function (w, h) { this.data = new Uint8ClampedArray(w * h * 4); this.width = w; this.height = h; };
-globalThis.createImageBitmap = undefined;
-globalThis.fetch = async () => { throw new Error('offline (smoke test)'); };
-globalThis.AbortController = globalThis.AbortController || class { constructor() { this.signal = {}; } abort() {} };
+/* ---- DOM / Canvas（厳格モック：canvas-mock.mjs に一本化） ---- */
+import { installDom } from './canvas-mock.mjs';
+installDom();
 
 /* ---------------- 実行 ---------------- */
 const require = createRequire(import.meta.url);
@@ -137,4 +83,24 @@ const hotspots = [];
 console.log('hotspots:', [...new Set(hotspots)].join(', '));
 console.log(`TOTAL: meshes≈${a.meshes + b.meshes + c.meshes + a.inst + b.inst + c.inst} tris≈${Math.round(a.tris + b.tris + c.tris)}`);
 console.log('desks/chairs:', furniture.count.desks, '/', furniture.count.chairs);
+
+// ジオメトリに NaN / Infinity が混入していないか（NaN 頂点は描画が壊れる）
+let badGeo = 0, checked = 0;
+[world.root, furniture.root, props.root].forEach((r) => r.traverse((o) => {
+  const g = o.geometry;
+  if (!g || !g.attributes || !g.attributes.position) return;
+  checked++;
+  const a = g.attributes.position.array;
+  for (let i = 0; i < a.length; i++) {
+    if (!Number.isFinite(a[i])) { badGeo++; console.error(`  !! NaN 頂点: ${o.name || o.type} index=${i}`); break; }
+  }
+  if (g.attributes.uv) {
+    const u = g.attributes.uv.array;
+    for (let i = 0; i < u.length; i++) {
+      if (!Number.isFinite(u[i])) { badGeo++; console.error(`  !! NaN UV: ${o.name || o.type} index=${i}`); break; }
+    }
+  }
+}));
+console.log(`geometry sanity: ${checked} 件チェック / 異常 ${badGeo} 件`);
+if (badGeo > 0) process.exitCode = 1;
 console.log('SMOKE OK');

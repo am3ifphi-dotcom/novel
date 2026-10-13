@@ -8,7 +8,8 @@
     "start": "python3 -m http.server 8000 --bind 0.0.0.0",
     "smoke": "node tools/smoke.mjs",
     "smoke:light": "node tools/smoke2.mjs",
-    "smoke:views": "node tools/views.mjs"
+    "smoke:views": "node tools/views.mjs",
+    "smoke:canvas": "node tools/canvas-regression.mjs"
   },
   "devDependencies": {
     "three": "0.170.0"
