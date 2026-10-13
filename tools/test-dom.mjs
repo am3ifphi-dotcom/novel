@@ -189,8 +189,55 @@ let loopErr = null;
 try { for (let i = 0; i < 30; i++) rig.update(0.016, i * 0.016); } catch (e) { loopErr = e; }
 ok(!loopErr, 'ライティングの毎フレーム更新が安定している', loopErr ? loopErr.message : '');
 
-/* ---------------- 5. 品質プリセット ---------------- */
-section('5. 品質プリセット');
+/* ---------------- 5. カメラの構図（各場面が「何か」を捉えているか） ---------------- */
+section('5. プリセットの構図（視錐台に象徴的な物が入っているか）');
+const { PerspectiveCamera, Vector3 } = await import('three');
+const win = ROOM.window;
+const winSpan = win.count * win.width + (win.count - 1) * win.gap;
+const corridor = room.corridor ?? { xOut: -7.28 };
+const y0 = ROOM.floorY;
+const probes = {
+  blackboard: [0, ROOM.blackboard.bottom + ROOM.blackboard.height / 2, -ROOM.depth / 2 + 0.23],
+  window: [ROOM.width / 2 - 0.1, win.sill + win.height / 2, 0],
+  sugarDesk: [room.seats.find((x) => x.row === 4 && x.col === 5)?.x ?? 2, 0.7, 2.55],
+  teacherDesk: [-0.1, 0.9, -3.05],
+  noticeWall: [1.3, 1.55, ROOM.depth / 2 - 0.12],
+  vending: [corridor.xOut + 0.42, 1.0, -2.7],
+  corridorBoard: [-ROOM.width / 2 - 0.25, 1.5, 0.9],
+  paddy: [40, y0, -30],
+  ridge: [95, y0 + 10, 0],
+  pylon: [46, y0 + 10, -8],
+  southBuilding: [30, y0 + 7, 36],
+};
+const expectations = {
+  morning: ['blackboard', 'window'], miso: ['blackboard'], lunch: ['window', 'sugarDesk'],
+  friday: ['window', 'sugarDesk'], after: ['blackboard'], corridor: ['vending', 'corridorBoard'],
+  outside: ['paddy', 'ridge', 'pylon'],
+};
+const framing = {};
+for (const cfg of SCENES) {
+  const cam = new PerspectiveCamera(52, 16 / 9, 0.05, 520);
+  cam.position.set(...cfg.camera.pos);
+  cam.lookAt(new Vector3(...cfg.camera.target));
+  cam.updateMatrixWorld(true);
+  cam.updateProjectionMatrix();
+  const inFrame = [];
+  for (const [name, p] of Object.entries(probes)) {
+    const v = new Vector3(...p).project(cam);
+    if (v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1) inFrame.push(name);
+  }
+  framing[cfg.id] = inFrame;
+  const want = expectations[cfg.id] ?? [];
+  const hit = want.filter((w) => inFrame.includes(w));
+  ok(hit.length > 0 && inFrame.length >= 2,
+    `場面「${cfg.label}」のカメラが象徴的な物を捉えている`,
+    `構図内: ${inFrame.join(', ') || 'なし'}`);
+}
+ok(SCENES.every((cfg) => (framing[cfg.id] ?? []).length > 0), 'どの場面も「何も無い方向」を向いていない');
+ok(!framing.corridor?.includes('blackboard'), '廊下からは黒板が見えない（壁が遮蔽している＝教室が独立している）');
+
+/* ---------------- 6. 品質プリセット ---------------- */
+section('6. 品質プリセット');
 const q = QUALITY;
 ok(q.low.shadowMapSize < q.high.shadowMapSize && q.low.pixelRatio <= 1.1, '軽量モードは影と解像度を落とす',
   `low: ${q.low.shadowMapSize}px / dpr${q.low.pixelRatio} → high: ${q.high.shadowMapSize}px / dpr${q.high.pixelRatio}`);

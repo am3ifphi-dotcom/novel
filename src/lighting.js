@@ -126,8 +126,14 @@ export class LightingRig {
     this.hemi.groundColor.set(0x6b6052);
     this.hemi.intensity = 0.16 + 0.42 * amb;
 
+    // 空ドームの色を先に差し替える（環境光のフォールバックが同じ空を使うため）
+    const sky = makeSkyTexture(sceneCfg.sky.top, sceneCfg.sky.horizon, sceneCfg.sky.glow, 0.5, 512, 256);
+    this._skyTex.image = sky;
+    this._skyTex.needsUpdate = true;
+    this.skyDome.rotation.y = -(s.azimuth - 180) * Math.PI / 180 * 0.5;
+
     // HDRI（environment のみ・背景には描かない）
-    const tex = envTexture ?? this._skyTex.clone();
+    const tex = envTexture ?? this._skyTex;
     tex.mapping = EquirectangularReflectionMapping;
     tex.needsUpdate = true;
     const pmrem = new PMREMGenerator(this.renderer);
@@ -138,12 +144,6 @@ export class LightingRig {
     this._envRT = envRT;
     pmrem.dispose();
 
-    // 空ドームの色を差し替え
-    const sky = makeSkyTexture(sceneCfg.sky.top, sceneCfg.sky.horizon, sceneCfg.sky.glow, 0.5, 512, 256);
-    this._skyTex.image = sky;
-    this._skyTex.needsUpdate = true;
-    this.skyDome.rotation.y = -(s.azimuth - 180) * Math.PI / 180 * 0.5;
-
     // 光の筋
     this._buildShafts(dir);
     if (this.dust) this.setDustVisible(this.quality.shafts);
@@ -153,6 +153,7 @@ export class LightingRig {
   }
 
   _buildShafts(dir) {
+    for (const child of this.shafts.children) child.geometry?.dispose();   // 場面切替でジオメトリを溜めない
     this.shafts.clear();
     if (!this.quality.shafts) return;
     const d = new Vector3(-dir.x, -dir.y, -dir.z).normalize(); // 窓 → 室内へ進む向き
@@ -214,7 +215,7 @@ export class LightingRig {
   /** 埃（Points 1ドローコール・窓際に6割を集中） */
   buildDust(count = null) {
     const n = count ?? this.quality.dust;
-    if (this.dust) { this.scene.remove(this.dust); this.dust.geometry.dispose(); }
+    if (this.dust) { this.scene.remove(this.dust); this.dust.geometry.dispose(); this.dust.material.dispose(); }
     if (n <= 0) { this.dust = null; return; }
     const pos = new Float32Array(n * 3);
     const size = this.room.width / 2 - 0.6;
