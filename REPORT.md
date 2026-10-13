@@ -209,6 +209,20 @@ Node 側スモークテストの Canvas モックは、**本物の Canvas API �
 `createLinearGradient` / `createRadialGradient` の NaN・負の半径、`arc` / `ellipse` の負の半径を検出します。
 加えて `npm run smoke` は**全ジオメトリの頂点・UV に NaN が混入していないか**も検査します（179件／異常0件）。
 
+### Canvas 2D の防御層
+
+`index.html` の先頭で `CanvasGradient.prototype.addColorStop` と
+`createLinearGradient` / `createRadialGradient` をラップし、非有限のオフセットや座標を
+**0 / 範囲内に丸めて続行**します。万が一呼び出し側にミスがあっても、
+Canvas の `DOMException` でシーン生成が止まることはなく、
+原因箇所は `[canvas-guard]` として console にスタックトレース付きで記録されます。
+
+### ローカル配信
+
+`python3 serve.py [port]`（Python 標準ライブラリのみ）。
+開発中に「直したのに古い JS が読まれる」を防ぐため、全レスポンスに
+`Cache-Control: no-store` を付けています。
+
 ---
 
 ## 8. ファイル構成

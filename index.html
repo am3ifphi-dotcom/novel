@@ -95,6 +95,54 @@
 
 <script>
 /**
+ * ── Canvas 2D の防御層 ────────────────────────────────────────────
+ * 最重要ルール3「どの不具合でも白画面・クラッシュさせない」を Canvas レベルで保証する。
+ * addColorStop に非有限のオフセットが渡るとブラウザは DOMException を投げて
+ * 描画生成が止まるため、ここで 0 に丸めて続行し、原因箇所を console に出す。
+ * （本来は呼び出し側を正すべきだが、まず「落ちない」ことを最優先する）
+ */
+(function () {
+  if (typeof CanvasGradient === 'undefined' || !CanvasGradient.prototype) return;
+  var origAdd = CanvasGradient.prototype.addColorStop;
+  if (typeof origAdd !== 'function') return;
+  var warned = 0;
+  CanvasGradient.prototype.addColorStop = function (offset, color) {
+    var o = typeof offset === 'number' ? offset : parseFloat(offset);
+    if (!isFinite(o)) {
+      if (warned++ < 3) {
+        console.error('[canvas-guard] addColorStop に非有限のオフセットが渡されました。0 に丸めて続行します。',
+          { offset: offset, color: color, stack: new Error().stack });
+      }
+      o = 0;
+    } else if (o < 0 || o > 1) {
+      o = o < 0 ? 0 : 1;
+    }
+    if (typeof color !== 'string' || color === '') color = 'rgba(0,0,0,0)';
+    try { return origAdd.call(this, o, color); } catch (e) {
+      console.error('[canvas-guard] addColorStop を復旧できませんでした:', e);
+    }
+  };
+
+  // グラデーション生成の座標・半径も同様に守る
+  if (typeof CanvasRenderingContext2D !== 'undefined') {
+    ['createLinearGradient', 'createRadialGradient'].forEach(function (name) {
+      var f = CanvasRenderingContext2D.prototype[name];
+      if (typeof f !== 'function') return;
+      CanvasRenderingContext2D.prototype[name] = function () {
+        var a = Array.prototype.slice.call(arguments);
+        for (var i = 0; i < a.length; i++) {
+          if (typeof a[i] !== 'number' || !isFinite(a[i])) a[i] = 0;
+        }
+        return f.apply(this, a);
+      };
+    });
+  }
+  window.__canvasGuard = true;
+})();
+</script>
+
+<script>
+/**
  * three.js の CDN を実行時に切り替えられるよう、importmap を動的生成する。
  * （jsdelivr → unpkg の順に到達確認。どちらも駄目なら jsdelivr で試す）
  * さらに 25 秒経っても起動しなければ予備画面を出す＝白画面回避。
@@ -106,6 +154,9 @@
   ];
   var booted = false;
   window.__bootOK = function () { booted = true; clearTimeout(fatalTimer); };
+
+  // 読み込まれている版を console で確認できるようにする（キャッシュの切り分け用）
+  window.__BUILD__ = '2026-10-13b';
 
   function showFatal(msg) {
     if (booted) return;
@@ -133,7 +184,8 @@
     document.head.appendChild(im);
     var s = document.createElement('script');
     s.type = 'module';
-    s.src = './src/main.js';
+    // ?v= でキャッシュを確実に外す（古いモジュールが残って不具合が再現するのを防ぐ）
+    s.src = './src/main.js?v=' + Date.now();
     s.onerror = function () { showFatal('src/main.js を読み込めませんでした。'); };
     document.body.appendChild(s);
   }
