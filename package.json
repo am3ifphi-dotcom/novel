@@ -1,0 +1,21 @@
+{
+  "name": "kirisato-koushitsu-3d",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "gensaku.txt「偏差値60の教室から✝本質✝が漏れ出している件について」の世界観で作ったインタラクティブ3D教室（three.js）。",
+  "scripts": {
+    "start": "python3 serve.py 8000",
+    "smoke": "node tools/smoke.mjs",
+    "smoke:light": "node tools/smoke2.mjs",
+    "smoke:views": "node tools/views.mjs",
+    "smoke:canvas": "node tools/canvas-regression.mjs",
+    "smoke:nav": "node tools/nav.mjs"
+  },
+  "devDependencies": {
+    "three": "^0.170.0"
+  },
+  "comments": {
+    "note": "three は開発時のスモークテスト専用。本番（index.html）は importmap で CDN から読み込みます。"
+  }
+}

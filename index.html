@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>偏差値60の教室から✝本質✝が漏れ出している件について ─ 桐葉高校 北棟 理数科B組</title>
+<meta name="description" content="gensaku.txt の世界観を three.js で再現したインタラクティブ3D教室。桐葉高校 北棟2階 理数科B組／金曜五限。" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+<canvas id="scene" aria-label="3D教室"></canvas>
+
+<!-- ========== ローディング ========== -->
+<div id="loading" role="status" aria-live="polite">
+  <div class="ld-inner">
+    <div class="ld-mark" aria-hidden="true"></div>
+    <h1 class="ld-title">偏差値60の教室から<span class="ess">✝本質✝</span>が漏れ出している件について</h1>
+    <p class="ld-place">桐葉高校 北棟2階 ・ 理数科B組 ／ 金曜五限</p>
+    <div class="ld-bar"><div class="ld-fill" id="bar-fill"></div></div>
+    <p class="ld-status" id="load-status">準備中…</p>
+    <button class="ld-skip" id="load-skip" type="button" hidden>取得を待たずに開始する</button>
+    <p class="ld-note">外部アセット（Poly Haven / Khronos glTF）は取得できない場合、すべてプロシージャルに差し替えます。</p>
+  </div>
+</div>
+
+<!-- ========== 起動失敗時の予備 ========== -->
+<div id="fatal" hidden>
+  <div class="fatal-inner">
+    <h2>起動できませんでした</h2>
+    <p id="fatal-msg"></p>
+    <button type="button" onclick="location.reload()">再読み込み</button>
+  </div>
+</div>
+
+<!-- ========== 表題 ========== -->
+<header id="title-card">
+  <div class="tc-mark" aria-hidden="true"></div>
+  <div class="tc-text">
+    <div class="tc-title">偏差値60の教室から<span class="ess">✝本質✝</span>が漏れ出している件について</div>
+    <div class="tc-sub">桐葉高校 北棟2階 ・ 理数科B組<span class="sep">／</span><span id="tc-time">金曜五限</span></div>
+  </div>
+</header>
+
+<!-- ========== 操作ヒント（モードによって中身を差し替える） ========== -->
+<div id="hint">
+  <span>WASD＝歩く</span><span>マウス＝見回す</span><span>Shift＝小走り</span><span>C＝しゃがむ</span><span class="accent">E＝調べる</span>
+</div>
+
+<!-- ========== 一人称：照準・注視ラベル・ロック案内 ========== -->
+<div id="crosshair" hidden aria-hidden="true"><span></span></div>
+<div id="gaze-label" hidden></div>
+<button type="button" id="lock-prompt" hidden>
+  <span class="lp-key">画面をクリック</span>すると歩けます<span class="lp-sub">（Esc で視点を離す）</span>
+</button>
+
+<!-- ========== 視点プリセット（左下） ========== -->
+<nav id="panel-views" aria-label="視点とモード">
+  <div class="pnl-block">
+    <div class="pnl-head">移動モード</div>
+    <div class="row" id="mode-buttons"></div>
+  </div>
+  <div class="pnl-head">視点</div>
+  <div id="view-buttons"></div>
+</nav>
+
+<!-- ========== タッチ操作（移動スティック） ========== -->
+<div id="touch-stick" hidden aria-hidden="true"><div class="ts-knob"></div></div>
+
+<!-- ========== ギミック（右下） ========== -->
+<section id="panel-controls" aria-label="時間帯とギミック">
+  <div class="pnl-block">
+    <div class="pnl-head">時間帯</div>
+    <div class="row" id="time-buttons"></div>
+  </div>
+  <div class="pnl-block">
+    <div class="pnl-head">黒板</div>
+    <div class="row" id="board-buttons"></div>
+  </div>
+  <div class="pnl-block">
+    <div class="pnl-head">ギミック</div>
+    <div class="row" id="toggle-buttons"></div>
+  </div>
+  <div class="pnl-block pnl-foot">
+    <button type="button" id="btn-report" class="ghost">採用アセット一覧</button>
+    <button type="button" id="btn-help" class="ghost">このsceneについて</button>
+  </div>
+</section>
+
+<!-- ========== ホットスポットの引用カード ========== -->
+<div id="hotspot-card" hidden>
+  <button class="hc-close" id="hc-close" type="button" aria-label="閉じる">×</button>
+  <div class="hc-name" id="hc-name"></div>
+  <div class="hc-title" id="hc-title"></div>
+  <blockquote class="hc-body" id="hc-body"></blockquote>
+  <div class="hc-src" id="hc-src"></div>
+</div>
+
+<!-- ========== モーダル ========== -->
+<div id="modal" hidden>
+  <div class="modal-inner">
+    <button class="modal-close" id="modal-close" type="button" aria-label="閉じる">×</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- ========== ホバーラベル ========== -->
+<div id="hover-label" hidden></div>
+
+<script>
+/**
+ * ── Canvas 2D の防御層 ────────────────────────────────────────────
+ * 最重要ルール3「どの不具合でも白画面・クラッシュさせない」を Canvas レベルで保証する。
+ * addColorStop に非有限のオフセットが渡るとブラウザは DOMException を投げて
+ * 描画生成が止まるため、ここで 0 に丸めて続行し、原因箇所を console に出す。
+ * （本来は呼び出し側を正すべきだが、まず「落ちない」ことを最優先する）
+ */
+(function () {
+  if (typeof CanvasGradient === 'undefined' || !CanvasGradient.prototype) return;
+  var origAdd = CanvasGradient.prototype.addColorStop;
+  if (typeof origAdd !== 'function') return;
+  var warned = 0;
+  CanvasGradient.prototype.addColorStop = function (offset, color) {
+    var o = typeof offset === 'number' ? offset : parseFloat(offset);
+    if (!isFinite(o)) {
+      if (warned++ < 3) {
+        console.error('[canvas-guard] addColorStop に非有限のオフセットが渡されました。0 に丸めて続行します。',
+          { offset: offset, color: color, stack: new Error().stack });
+      }
+      o = 0;
+    } else if (o < 0 || o > 1) {
+      o = o < 0 ? 0 : 1;
+    }
+    if (typeof color !== 'string' || color === '') color = 'rgba(0,0,0,0)';
+    try { return origAdd.call(this, o, color); } catch (e) {
+      console.error('[canvas-guard] addColorStop を復旧できませんでした:', e);
+    }
+  };
+
+  // グラデーション生成の座標・半径も同様に守る
+  if (typeof CanvasRenderingContext2D !== 'undefined') {
+    ['createLinearGradient', 'createRadialGradient'].forEach(function (name) {
+      var f = CanvasRenderingContext2D.prototype[name];
+      if (typeof f !== 'function') return;
+      CanvasRenderingContext2D.prototype[name] = function () {
+        var a = Array.prototype.slice.call(arguments);
+        for (var i = 0; i < a.length; i++) {
+          if (typeof a[i] !== 'number' || !isFinite(a[i])) a[i] = 0;
+        }
+        return f.apply(this, a);
+      };
+    });
+  }
+  window.__canvasGuard = true;
+})();
+</script>
+
+<script>
+/**
+ * three.js の CDN を実行時に切り替えられるよう、importmap を動的生成する。
+ * （jsdelivr → unpkg の順に到達確認。どちらも駄目なら jsdelivr で試す）
+ * さらに 25 秒経っても起動しなければ予備画面を出す＝白画面回避。
+ */
+(function () {
+  var CDNS = [
+    'https://cdn.jsdelivr.net/npm/three@0.170.0/',
+    'https://unpkg.com/three@0.170.0/'
+  ];
+  var booted = false;
+  window.__bootOK = function () { booted = true; clearTimeout(fatalTimer); };
+
+  // 読み込まれている版を console で確認できるようにする（キャッシュの切り分け用）
+  window.__BUILD__ = '2026-10-13b';
+
+  function showFatal(msg) {
+    if (booted) return;
+    var el = document.getElementById('fatal');
+    document.getElementById('fatal-msg').textContent = msg || '';
+    el.hidden = false;
+    var ld = document.getElementById('loading');
+    if (ld) ld.hidden = true;
+  }
+  window.__showFatal = showFatal;
+
+  var fatalTimer = setTimeout(function () {
+    showFatal('three.js を CDN から読み込めませんでした。ネットワーク（cdn.jsdelivr.net / unpkg.com）をご確認ください。');
+  }, 25000);
+
+  function boot(base) {
+    var im = document.createElement('script');
+    im.type = 'importmap';
+    im.textContent = JSON.stringify({
+      imports: {
+        'three': base + 'build/three.module.js',
+        'three/addons/': base + 'examples/jsm/'
+      }
+    });
+    document.head.appendChild(im);
+    var s = document.createElement('script');
+    s.type = 'module';
+    // ?v= でキャッシュを確実に外す（古いモジュールが残って不具合が再現するのを防ぐ）
+    s.src = './src/main.js?v=' + Date.now();
+    s.onerror = function () { showFatal('src/main.js を読み込めませんでした。'); };
+    document.body.appendChild(s);
+  }
+
+  function tryNext(i) {
+    if (i >= CDNS.length) { boot(CDNS[0]); return; }
+    var ctrl = new AbortController();
+    var to = setTimeout(function () { ctrl.abort(); }, 6000);
+    fetch(CDNS[i] + 'package.json', { signal: ctrl.signal, cache: 'force-cache' })
+      .then(function (r) {
+        clearTimeout(to);
+        if (r.ok) boot(CDNS[i]); else tryNext(i + 1);
+      })
+      .catch(function () { clearTimeout(to); tryNext(i + 1); });
+  }
+  tryNext(0);
+})();
+</script>
+</body>
+</html>
